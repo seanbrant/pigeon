@@ -12,9 +12,6 @@ class Listener(object):
     def start(self):
         self.thread.start()
 
-    def stop(self):
-        self.running = False
-
     def listen(self):
         self.db.subscribe('pigeon:publish')
         for response in self.db.listen():
