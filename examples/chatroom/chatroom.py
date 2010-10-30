@@ -4,9 +4,9 @@ from os.path import realpath, dirname, join
 import tornado.web
 from tornad_io import SocketIOServer
 
+from pigeon.client import Pigeon
 from pigeon.handlers import PigeonHandler
 from pigeon.listeners import Listener
-from pigeon.publishers import Publisher
 
 
 STATIC_PATH = join(dirname(dirname(dirname(realpath(__file__)))), 'static')
@@ -26,8 +26,8 @@ class NewMessageHandler(tornado.web.RequestHandler):
     """
     def post(self, number):
         message = self.request.arguments.get('message')[0]
-        publisher = Publisher()
-        publisher.publish(self.request.path, {
+        pigeon = Pigeon()
+        pigeon.publish(self.request.path, {
             'message': message,
         })
 

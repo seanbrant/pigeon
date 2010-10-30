@@ -1,40 +1,18 @@
 (function(window, io) {
 
-    var console = window.console || {log: function(){ }, error: function(){ }};
+    function proxy(func, context) {
+        return function() {
+            return func.apply(context, arguments);
+        };
+    }
 
-    var pigeon = window.pigeon = {
-        version: '0.9',
-
-        DISCONNECTED: 0,
-        CONNECTING: 1,
-        CONNECTED: 2,
-        RECONNECTING: 3,
-
-        utils: {
-            proxy: function(func, context) {
-                return function() {
-                    return func.apply(context, arguments);
-                };
-            },
-
-            args: function(args) {
-                if (!args) return [];
-                var ret = [];
-                for (var i=0; i < args.length; i++) {
-                    ret.push(args[i]);
-                }
-                return ret;
-            }
-        }
-    };
-
-    pigeon.Subscriber = function(options) {
+    var Pigeon = window.Pigeon = function(options) {
         this.options = options || {};
         this.host = this.options.host || window.location.hostname;
         this.port = this.options.port || 8888;
 
         this.handlers = {};
-        this.state = pigeon.DISCONNECTED;
+        this.state = Pigeon.DISCONNECTED;
 
         this.socket = new io.Socket(this.host, {
             rememberTransport: false,
@@ -42,16 +20,35 @@
             secure: this.options.secure
         });
 
-        this.socket.on('connect', pigeon.utils.proxy(this._onConnect, this));
-        this.socket.on('message', pigeon.utils.proxy(this._onMessage, this));
-        //this.socket.on('disconnect', pigeon.utils.proxy(this._onDisconnect, this));
+        this.socket.on('connect', proxy(this._onConnect, this));
+        this.socket.on('message', proxy(this._onMessage, this));
+        this.socket.on('disconnect', proxy(this._onDisconnect, this));
     };
 
-    pigeon.Subscriber.prototype = {
+    Pigeon.DISCONNECTED = 'disconnected';
+    Pigeon.CONNECTING = 'connecting';
+    Pigeon.CONNECTED = 'connected';
+    Pigeon.RECONNECTING = 'reconnecting';
+
+    Pigeon.prototype = {
         connect: function() {
-            if (this.state == pigeon.CONNECTED || this.state == pigeon.CONNECTING) return;
-            this.state = pigeon.CONNECTING;
+            if (this.state == Pigeon.CONNECTED || this.state == Pigeon.CONNECTING) return;
+            this.state = Pigeon.CONNECTING;
             this.socket.connect();
+        },
+
+        reconnect: function() {
+            if (this.state == Pigeon.RECONNECTING) return;
+
+            this.state = Pigeon.RECONNECTING;
+            var interval = setInterval(proxy(function() {
+                if (this.state == Pigeon.CONNECTED) {
+                    clearInterval(interval);
+                } else {
+                    this.trigger('reconnect');
+                    this.connect();
+                }
+            }, this), 3000);
         },
 
         subscribe: function(channel, callback) {
@@ -59,14 +56,16 @@
 
             this.on(channel + ':data', callback);
 
-            var send = pigeon.utils.proxy(function() {
+            var send = proxy(function() {
                 this._send('subscribe', channel);
             }, this);
-            if (this.state == pigeon.DISCONNECTED) this.connect();
-            if (this.state == pigeon.CONNECTED) {
+
+            this.on('connect', send);
+
+            if (this.state == Pigeon.CONNECTED) {
                 send();
             } else {
-                this.on('connect', send);
+                this.connect();
             }
         },
 
@@ -82,7 +81,10 @@
         },
 
         trigger: function() {
-            var args = pigeon.utils.args(arguments);
+            var args = [];
+            for (var i=0; i < arguments.length; i++) {
+                args.push(arguments[i]);
+            }
             var name = args.shift();
             var callbacks = this.handlers[name] || [];
             for (var i=0; i < callbacks.length; i++) {
@@ -91,12 +93,23 @@
         },
 
         _onConnect: function() {
-            this.state = pigeon.CONNECTED;
+            this.state = Pigeon.CONNECTED;
             this.trigger('connect');
+        },
+
+        _onDisconnect: function() {
+            this.state = Pigeon.DISCONNECTED;
+            this.trigger('disconnect');
+
+            if (this.options.reconnect !== false) {
+                this.reconnect();
+            }
         },
 
         _onMessage: function(data) {
             var message = JSON.parse(data);
+            this.trigger('message', message);
+            this.trigger('data', message.channel, message.body);
             this.trigger(message.channel + ':data', message.body);
         },
 

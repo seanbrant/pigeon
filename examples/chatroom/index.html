@@ -9,8 +9,19 @@
         $(document).ready(function() {
             WEB_SOCKET_SWF_LOCATION = '/static/WebSocketMain.swf';
 
-            var subscriber = new pigeon.Subscriber();
-            subscriber.connect();
+            var pigeon = new Pigeon();
+            pigeon.connect();
+            pigeon.on('connect', function() {
+                console.log('connected');
+                console.log(this);
+                console.log('');
+            });
+            pigeon.on('disconnect', function() {
+                console.log('disconnected');
+                console.log(this);
+                console.log('');
+            });
+
             $('#room1, #room2').each(function() {
                 var form = $(this);
                 var url = form.attr('action');
@@ -24,7 +35,7 @@
                     return false;
                 });
 
-                subscriber.subscribe(url, function(data) {
+                pigeon.subscribe(url, function(data) {
                     $('<p>').text(data.message).appendTo(form);
                 });
             });

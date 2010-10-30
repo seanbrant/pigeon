@@ -1,4 +1,5 @@
 from tornad_io import SocketIOHandler
+
 from pigeon.channels import Channel
 from pigeon.actions import Action, InvalidActionError
 

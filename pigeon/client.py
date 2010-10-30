@@ -1,11 +1,12 @@
 from redis import Redis
+
 from pigeon.utils import json_dumps
 
 
-class Publisher(object):
+class Pigeon(object):
 
-    def __init__(self, redis=None, redis_host='localhost', redis_port=6379):
-        self.db = redis or Redis(host=redis_host, port=redis_port)
+    def __init__(self, db=None, host='localhost', port=6379):
+        self.db = db or Redis(host=host, port=port)
 
     def publish(self, channel, body=None):
         payload = json_dumps({

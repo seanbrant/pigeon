@@ -1,5 +1,7 @@
 from threading import Thread
+
 from redis import Redis
+
 from pigeon.messages import Message, InvalidMessageError
 
 
